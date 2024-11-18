@@ -1,0 +1,244 @@
+import json
+from datetime import datetime
+import os
+
+class SistemaNomina:
+        def __init__(self):
+            self.archivo_json = "empleados.json"
+            self.empleados = self.cargar_empleados()
+            self.contador_empleados = self.obtener_ultimo_id() + 1
+
+        def cargar_empleados(self):
+            """Carga los empleados desde el archivo JSON"""
+            if os.path.exists(self.archivo_json):
+                try:
+                    with open(self.archivo_json, 'r', encoding='utf-8') as archivo:
+                        return json.load(archivo)
+                except json.JSONDecodeError:
+                    print("Error al cargar el archivo JSON. Iniciando con lista vacía.")
+                    return []
+            return []
+
+        def guardar_empleados(self):
+            """Guarda los empleados en el archivo JSON"""
+            with open(self.archivo_json, 'w', encoding='utf-8') as archivo:
+                json.dump(self.empleados, archivo, indent=4, ensure_ascii=False)
+
+        def obtener_ultimo_id(self):
+            """Obtiene el último ID utilizado"""
+            if not self.empleados:
+                return 0
+            return max(emp['id'] for emp in self.empleados)
+
+        def validar_salario(self, salario_str):
+            """Valida que el salario sea un número válido y positivo"""
+            try:
+                salario = float(salario_str)
+                if salario <= 0:
+                    print("El salario debe ser mayor que cero!")
+                    return None
+                return salario
+            except ValueError:
+                print("¡Por favor ingrese un número válido!")
+                return None
+
+        def crear_empleado(self):
+            """Crea un nuevo empleado (Create)"""
+            print("\n--- Agregar Nuevo Empleado ---")
+
+            nombre = input("Nombre del empleado: ").strip()
+            while not nombre:
+                print("El nombre no puede estar vacío!")
+                nombre = input("Nombre del empleado: ").strip()
+
+            while True:
+                salario = self.validar_salario(input("Salario base: $"))
+                if salario is not None:
+                    break
+
+            cargo = input("Cargo: ").strip()
+            while not cargo:
+                print("El cargo no puede estar vacío!")
+                cargo = input("Cargo: ").strip()
+
+            empleado = {
+                "id": self.contador_empleados,
+                "nombre": nombre,
+                "salario": salario,
+                "cargo": cargo,
+                "fecha_ingreso": datetime.now().strftime("%d/%m/%Y")
+            }
+
+            self.empleados.append(empleado)
+            self.contador_empleados += 1
+            self.guardar_empleados()
+
+            print(f"\nEmpleado {empleado['nombre']} agregado con éxito!")
+            return empleado
+
+        def leer_empleado(self, mostrar_nomina=False):
+            """Lee la información de un empleado (Read)"""
+            if not self.empleados:
+                print("\nNo hay empleados registrados!")
+                return None
+
+            print("\nEmpleados registrados:")
+            for emp in self.empleados:
+                print(f"ID: {emp['id']} - {emp['nombre']} - {emp['cargo']}")
+
+            while True:
+                try:
+                    id_buscar = int(input("\nIngrese el ID del empleado a buscar: "))
+                    empleado = next((emp for emp in self.empleados if emp['id'] == id_buscar), None)
+                    if empleado:
+                        if mostrar_nomina:
+                            self.mostrar_nomina(empleado)
+                        else:
+                            self.mostrar_detalles_empleado(empleado)
+                        return empleado
+                    print("¡Empleado no encontrado!")
+                except ValueError:
+                    print("¡Por favor ingrese un número válido!")
+
+        def actualizar_empleado(self):
+            """Actualiza la información de un empleado (Update)"""
+            empleado = self.leer_empleado()
+            if not empleado:
+                return False
+
+            print("\n--- Actualizar Empleado ---")
+            print("Deje en blanco si no desea modificar el campo")
+
+            nombre = input(f"Nombre actual ({empleado['nombre']}): ").strip()
+            if nombre:
+                empleado['nombre'] = nombre
+
+            salario_str = input(f"Salario actual (${empleado['salario']:,.2f}): ").strip()
+            if salario_str:
+                salario = self.validar_salario(salario_str)
+                if salario is not None:
+                    empleado['salario'] = salario
+
+            cargo = input(f"Cargo actual ({empleado['cargo']}): ").strip()
+            if cargo:
+                empleado['cargo'] = cargo
+
+            self.guardar_empleados()
+            print(f"\nEmpleado {empleado['nombre']} actualizado con éxito!")
+            return True
+
+        def eliminar_empleado(self):
+            """Elimina un empleado (Delete)"""
+            empleado = self.leer_empleado()
+            if not empleado:
+                return False
+
+            confirmacion = input(f"\n¿Está seguro de eliminar al empleado {empleado['nombre']}? (s/n): ").lower()
+            if confirmacion == 's':
+                self.empleados = [emp for emp in self.empleados if emp['id'] != empleado['id']]
+                self.guardar_empleados()
+                print(f"\nEmpleado {empleado['nombre']} eliminado con éxito!")
+                return True
+
+            print("\nOperación cancelada.")
+            return False
+
+        def calcular_deducciones(self, salario):
+            """Calcula las deducciones del salario"""
+            salud = salario * 0.04
+            pension = salario * 0.04
+            total = salud + pension
+            return salud, pension, total
+
+        def calcular_beneficios(self, salario):
+            """Calcula los beneficios del empleado"""
+            auxilio = 140606 if salario <= 2320000 else 0
+            prima = salario / 12
+            cesantias = salario / 12
+            intereses = (cesantias * 0.12) / 12
+            total = auxilio + prima + cesantias + intereses
+            return auxilio, prima, cesantias, intereses, total
+
+        def mostrar_detalles_empleado(self, empleado):
+            """Muestra los detalles básicos de un empleado"""
+            print("\n=== DETALLES DEL EMPLEADO ===")
+            print(f"ID: {empleado['id']}")
+            print(f"Nombre: {empleado['nombre']}")
+            print(f"Cargo: {empleado['cargo']}")
+            print(f"Salario: ${empleado['salario']:,.2f}")
+            print(f"Fecha de ingreso: {empleado['fecha_ingreso']}")
+            print("============================")
+
+        def mostrar_nomina(self, empleado):
+            """Muestra la nómina completa de un empleado"""
+            salud, pension, total_deduc = self.calcular_deducciones(empleado["salario"])
+            auxilio, prima, cesantias, intereses, total_benef = self.calcular_beneficios(empleado["salario"])
+            salario_neto = empleado["salario"] - total_deduc + total_benef
+
+            print("\n========= COLILLA DE PAGO =========")
+            print(f"Empleado: {empleado['nombre']}")
+            print(f"Cargo: {empleado['cargo']}")
+            print(f"Fecha: {empleado['fecha_ingreso']}")
+            print("===================================")
+            print(f"\nSalario Base: ${empleado['salario']:,.2f}")
+            print("\nDEDUCCIONES:")
+            print(f"  Salud (4%): ${salud:,.2f}")
+            print(f"  Pensión (4%): ${pension:,.2f}")
+            print(f"  Total Deducciones: ${total_deduc:,.2f}")
+            print("\nBENEFICIOS:")
+            print(f"  Auxilio de Transporte: ${auxilio:,.2f}")
+            print(f"  Prima: ${prima:,.2f}")
+            print(f"  Cesantías: ${cesantias:,.2f}")
+            print(f"  Intereses Cesantías: ${intereses:,.2f}")
+            print(f"  Total Beneficios: ${total_benef:,.2f}")
+            print("===================================")
+            print(f"SALARIO NETO: ${salario_neto:,.2f}")
+            print("===================================")
+
+        def listar_empleados(self):
+            """Lista todos los empleados registrados"""
+            if not self.empleados:
+                print("\nNo hay empleados registrados!")
+                return
+
+            print("\n=== LISTA DE EMPLEADOS ===")
+            for emp in self.empleados:
+                print(f"ID: {emp['id']} - {emp['nombre']} - {emp['cargo']} - ${emp['salario']:,.2f}")
+            print("==========================")
+
+        def menu_principal(self):
+            """Menú principal del sistema"""
+            while True:
+                print("\n=== SISTEMA DE NÓMINA CRUD ===")
+                print("1. Crear empleado")
+                print("2. Ver detalles de empleado")
+                print("3. Ver nómina de empleado")
+                print("4. Actualizar empleado")
+                print("5. Eliminar empleado")
+                print("6. Listar todos los empleados")
+                print("7. Salir")
+
+                opcion = input("\nElija una opción: ")
+
+                if opcion == "1":
+                    self.crear_empleado()
+                elif opcion == "2":
+                    self.leer_empleado(mostrar_nomina=False)
+                elif opcion == "3":
+                    self.leer_empleado(mostrar_nomina=True)
+                elif opcion == "4":
+                    self.actualizar_empleado()
+                elif opcion == "5":
+                    self.eliminar_empleado()
+                elif opcion == "6":
+                    self.listar_empleados()
+                elif opcion == "7":
+                    print("\n¡Gracias por usar el sistema!")
+                    break
+                else:
+                    print("\n¡Opción no válida!")
+
+if __name__ == "__main__":
+        sistema = SistemaNomina()
+        print("¡Bienvenido al Sistema de Nómina!")
+        sistema.menu_principal()
